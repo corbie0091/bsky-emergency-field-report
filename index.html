@@ -85,13 +85,13 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 </script>
 <script>
 const KEY='bsky_emergency_entries_v1', TTL=24*60*60*1000;
-const groups=[{name:'무학',tone:'#258fe5',soft:'#e9f5ff',border:'#b6ddfa',items:['좋은데이','갈매기','톡소다']},{name:'하이트진로',tone:'#2aa657',soft:'#eaf6ed',border:'#bee4c7',items:['참이슬','진로','기타']},{name:'대선주조',tone:'#ef9a00',soft:'#fff6e8',border:'#ffe0aa',items:['대선','부산','기타']},{name:'롯데주류',tone:'#ee4f59',soft:'#fff0f1',border:'#ffd0d4',items:['새로','청하','기타']}];
+const groups=[{name:'무학',tone:'#258fe5',soft:'#e9f5ff',border:'#b6ddfa',items:['좋은데이','갈매기','톡소다']},{name:'하이트진로',tone:'#2aa657',soft:'#eaf6ed',border:'#bee4c7',items:['참이슬','진로','기타']},{name:'대선주조',tone:'#ef9a00',soft:'#fff6e8',border:'#ffe0aa',items:['대선','부산','기타']},{name:'롯데주류',tone:'#ee4f59',soft:'#fff0f1',border:'#ffd0d4',items:['새로','청하','기타']},{name:'기타 제조사',tone:'#9b55ad',soft:'#f7edf9',border:'#e5caeb',items:['기타']}];
 const $=id=>document.getElementById(id); let state={setup:null,expiresAt:0,records:[]}, editingId=null, exportFile=null, toastTimer;
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const formatTime=ms=>new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(ms));
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3200)}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));return true}catch(error){toast('기기 저장 공간을 사용할 수 없습니다. 브라우저 설정을 확인해 주세요.');return false}}
-function load(){try{const parsed=JSON.parse(localStorage.getItem(KEY)||'null');if(parsed&&parsed.setup&&Array.isArray(parsed.records)&&Number.isFinite(parsed.expiresAt)){if(Date.now()>=parsed.expiresAt){localStorage.removeItem(KEY);toast('24시간이 지나 이전 기록이 만료되었습니다.')}else state=parsed}}catch(error){toast('저장된 데이터를 불러오지 못했습니다.')}}
+function load(){try{const parsed=JSON.parse(localStorage.getItem(KEY)||'null');if(parsed&&parsed.setup&&Array.isArray(parsed.records)&&Number.isFinite(parsed.expiresAt)){if(Date.now()>=parsed.expiresAt){localStorage.removeItem(KEY);toast('24시간이 지나 이전 기록이 만료되었습니다.')}else {for(const record of parsed.records){if(Array.isArray(record.products)&&record.products.length===4)record.products.push([0])}state=parsed}}}catch(error){toast('저장된 데이터를 불러오지 못했습니다.')}}
 function checkExpiry(){if(state.setup&&Date.now()>=state.expiresAt){localStorage.removeItem(KEY);state={setup:null,expiresAt:0,records:[]};editingId=null;exportFile=null;$('setupForm').reset();$('entryForm').reset();render();toast('24시간이 지나 기록이 만료되었습니다.')}}
 function num(value){const n=Number(value);return Number.isFinite(n)?Math.max(0,Math.min(999999,Math.floor(n))):0}
 function qty(id,value=0){return `<div class="qty"><button type="button" data-step="-1" data-target="${id}" aria-label="수량 1 감소">−</button><input id="${id}" type="number" inputmode="numeric" min="0" max="999999" step="1" value="${num(value)}" aria-label="수량"><button type="button" class="plus" data-step="1" data-target="${id}" aria-label="수량 1 증가">+</button></div>`}
@@ -140,7 +140,7 @@ function prepareExcel(){
     }
     const wb=XLSX.utils.book_new();
     const visitSheet=XLSX.utils.json_to_sheet(visits),performanceSheet=XLSX.utils.json_to_sheet(performances);
-    visitSheet['!cols']=[{wch:21},{wch:20},{wch:20},{wch:15},{wch:20},...Array(12+personColumns*3).fill({wch:15})];
+    visitSheet['!cols']=[{wch:21},{wch:20},{wch:20},{wch:15},{wch:20},...Array(groups.reduce((n,g)=>n+g.items.length,0)+personColumns*3).fill({wch:15})];
     performanceSheet['!cols']=[{wch:21},{wch:20},{wch:20},{wch:15},{wch:20},{wch:14},{wch:12},{wch:12}];
     XLSX.utils.book_append_sheet(wb,visitSheet,'업소별 음용비');
     XLSX.utils.book_append_sheet(wb,performanceSheet,'행사자별 실적');
@@ -199,7 +199,7 @@ function prepareChartImage(totals,total,colors,visits,context){
 function downloadChart(){const url=URL.createObjectURL(chartImage),a=document.createElement('a');a.href=url;a.download=chartImage.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('그래프 이미지를 다운로드했습니다.')}
 $('shareChart').addEventListener('click',async()=>{checkExpiry();if(!state.records.length||$('closingReport').hidden||!chartImage){toast('보고서를 다시 생성해 주세요.');return}try{if(typeof navigator.share!=='function'||(typeof navigator.canShare==='function'&&!navigator.canShare({files:[chartImage]}))){downloadChart();return}await navigator.share({files:[chartImage]})}catch(error){if(error.name!=='AbortError')toast('이미지 공유 창을 열지 못했습니다. 다시 시도해 주세요.')}});
 function renderReportChart(){
-  const totals=groups.map(()=>0),records=state.records,colors=['#456bc9','#d6564b','#54a96c','#eaa340'];
+  const totals=groups.map(()=>0),records=state.records,colors=['#456bc9','#d6564b','#54a96c','#eaa340','#9b55ad'];
   const contexts=[...new Set(records.map(r=>`${r.setup.market} · ${r.setup.submarket} · ${r.setup.team}`))];
   records.forEach(r=>r.products.forEach((values,i)=>{if(i<totals.length)totals[i]+=values.reduce((sum,value)=>sum+num(value),0)}));
   const total=totals.reduce((sum,value)=>sum+value,0);
